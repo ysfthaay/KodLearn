@@ -33,6 +33,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  String? _loadError;
 
   // Chapter names matching dashboard
   final List<String> _chapterNames = [
@@ -85,14 +86,67 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    if (mounted) {
-      setState(() {
-        _userData = doc.data();
-        _isLoading = false;
-      });
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
     }
+    if (mounted && !_isLoading) setState(() => _isLoading = true);
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (mounted) {
+        setState(() {
+          _userData = doc.data();
+          _loadError = null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Without this the spinner never stops when Firestore rejects the
+      // read (e.g. permission-denied from security rules).
+      debugPrint('Profil yüklenemedi: $e');
+      if (mounted) {
+        setState(() {
+          _loadError = e is FirebaseException && e.code == 'permission-denied'
+              ? 'Profil verilerine erişim izni yok.'
+              : 'Profil yüklenemedi. Bağlantını kontrol edip tekrar dene.';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 40, color: _kDanger),
+          const SizedBox(height: 12),
+          Text(_loadError!,
+              style: const TextStyle(fontSize: 14, color: _kText), textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: () => context.go('/dashboard'),
+                child: const Text("Dashboard'a Dön", style: TextStyle(color: _kSubtitle)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _loadUserData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Tekrar Dene'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   // Parses the dailyActivity map from the user doc into a typed
@@ -573,6 +627,8 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: _kBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _kAccent))
+          : _loadError != null
+          ? _buildLoadError()
           : SafeArea(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
