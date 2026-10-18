@@ -275,7 +275,7 @@ Contributions, issues and feature requests are welcome!
 
 <div align="center">
 
-Made with ❤️ by **[@ysfthaay](https://github.com/ysfthaay)**
+Made by **[@ysfthaay](https://github.com/ysfthaay)**
 
 ⭐ If you like this project, give it a star!
 
